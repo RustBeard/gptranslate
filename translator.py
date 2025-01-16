@@ -68,24 +68,39 @@ def split_markdown(file_path, max_words=250):
 
     return fragments
 
+# Load glossary files from a folder
+def load_glossary(folder_path):
+    glossary_content = ""
+    try:
+        for file_name in os.listdir(folder_path):
+            file_path = os.path.join(folder_path, file_name)
+            if os.path.isfile(file_path) and file_name.endswith('.txt'):
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    glossary_content += f.read() + "\n"
+    except FileNotFoundError:
+        raise FileNotFoundError(f"Folder {folder_path} does not exist.")
+    except Exception as e:
+        raise ValueError(f"Error reading glossary files: {e}")
+
+    return glossary_content.strip()
+
 # Translate a fragment
-def translate_fragment(fragment, instructions):
+def translate_fragment(fragment, instructions, glossary):
     try:
         response = openai.chat.completions.create(
             model="gpt-4",
             messages=[
                 {"role": "system", "content": "You are a professional translator."},
+                {"role": "system", "content": f"Use the following glossary for reference:\n{glossary}"},
                 {"role": "user", "content": f"{instructions}\n\n{fragment}"}
             ]
         )
         return response.choices[0].message.content
     except openai.OpenAIError as e:
-        # Log or raise
-        print(f"Błąd podczas tłumaczenia: {e}")
+        print(f"Translation error: {e}")
         return None
     except Exception as e:
-        # Log or raise
-        print(f"Nieoczekiwany błąd: {e}")
+        print(f"Unexpected error: {e}")
         return None
 
 # Append to output file
@@ -94,21 +109,21 @@ def append_to_file(output_path, translated_text):
         f.write(translated_text + "\n\n")
 
 # Main translation function
-def translate_markdown_file(source_path, output_path, instructions, max_words):
+def translate_markdown_file(source_path, output_path, instructions, max_words, glossary):
     fragments = split_markdown(source_path, max_words)
 
     if os.path.exists(output_path):
-        print(f"Usuwam istniejący plik wynikowy: {output_path}")
+        print(f"Removing existing output file: {output_path}")
         os.remove(output_path)
 
-    for i, fragment in enumerate(tqdm(fragments, desc="Tłumaczenie fragmentów"), start=1):
-        translated = translate_fragment(fragment, instructions)
+    for i, fragment in enumerate(tqdm(fragments, desc="Translating fragments"), start=1):
+        translated = translate_fragment(fragment, instructions, glossary)
         if translated:
             append_to_file(output_path, translated)
         else:
-            print(f"Fragment {i} pominięty z powodu błędu.")
+            print(f"Fragment {i} skipped due to an error.")
 
-    print("Tłumaczenie zakończone!")
+    print("Translation completed!")
 
 # Main function
 def main():
@@ -116,15 +131,17 @@ def main():
     verify_api_key()
 
     try:
+        glossary = load_glossary(config["glossary_folder"])
         translate_markdown_file(
             source_path=config["source_file"],
             output_path=config["output_file"],
             instructions=config["instructions"],
-            max_words=config["max_words"]
+            max_words=config["max_words"],
+            glossary=glossary
         )
     except Exception as e:
-        logging.error(f"Błąd krytyczny: {e}")
-        print(f"Wystąpił błąd: {e}")
+        logging.error(f"Critical error: {e}")
+        print(f"An error occurred: {e}")
 
 if __name__ == "__main__":
     main()
