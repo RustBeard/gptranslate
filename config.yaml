@@ -1,0 +1,5 @@
+source_file: "do_tlumaczenia.md"
+output_file: "przetlumaczone.md"
+instructions: "Proszę przetłumaczyć tekst na polski. "
+max_words: 250
+glossary_folder: "reference_files"
